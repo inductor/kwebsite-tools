@@ -21,7 +21,7 @@ p = inflect.engine()
 data = {}
 TEMPLATE_TITLE='{{ milestone }} Japanese l10n work for release-{{ version }}'
 TEMPLATE_COMMENT='''
-{{ milestone }} Japanese l10n work for release-{{ version }}.(include minimum l10n contents)
+{{ milestone }} Japanese l10n work for release-{{ version }}.
 
 <details>
   <summary><b>Change List</b></summary>

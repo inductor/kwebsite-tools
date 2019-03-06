@@ -21,7 +21,7 @@ p = inflect.engine()
 data = {}
 TEMPLATE_TITLE='{{ milestone }} Japanese l10n work for release-{{ version }}'
 TEMPLATE_COMMENT='''
-{{ milestone }} Japanese l10n work for release-{{ version }}.
+{{ milestone }} Japanese l10n work for release-{{ version }}.(include minimum l10n contents)
 
 <details>
   <summary><b>Change List</b></summary>
@@ -77,7 +77,17 @@ elif args.submit:
     print('submit...')
     data['mention'] = True
     pr_comment = template_comment.render(data)
+    main_repo = g.get_repo(MAIN_REPO)
+    main_repo.create_pull(
+        title=pr_title,
+        body=pr_comment,
+        base=args.base_branch,
+        head=args.head_branch,
+        maintainer_can_modify=True
+    )
 else:
+    data['mention'] = True
+    pr_comment = template_comment.render(data)
     print('Title: ')
     print('\t' + pr_title)
     print('Comment:')

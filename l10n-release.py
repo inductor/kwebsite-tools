@@ -11,7 +11,7 @@ MAIN_REPO = 'kubernetes/website'
 TEST_REPO = 'cstoku/kwebsite'
 
 parser = argparse.ArgumentParser(description='Japanese l10n Release PR Submit Script.')
-parser.add_argument('head_branch', help='Head branch(eg. dev-1.13.ja.1)')
+parser.add_argument('head_branch', help='Head branch(eg. dev-1.13-ja.1)')
 parser.add_argument('base_branch', help='Base branch(eg. master)')
 parser.add_argument('-s', '--submit', action='store_true')
 parser.add_argument('-t', '--test', action='store_true')

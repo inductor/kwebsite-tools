@@ -15,9 +15,9 @@ I18N_LABEL = 'language/ja'
 
 MODIFY_TITLE_TEMPLATE = '''
 {%- if urlpath -%}
-ja: Update k8s.io/{{ urlpath }}
+Update k8s.io/{{ urlpath }}
 {%- else -%}
-ja: Update {{ i18n_path | replace('content/ja/', '', 1) }}
+Update {{ i18n_path | replace('content/ja/', '', 1) }}
 {%- endif -%}
 '''
 MODIFY_BODY_TEMPLATE = '''
@@ -54,9 +54,9 @@ https://kubernetes.io/{{ urlpath }}
 '''
 CREATE_TITLE_TEMPLATE = '''
 {%- if 'docs/setup/' is in i18n_path -%}
-ja: Translate heading and subheading of {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
+Translate heading and subheading of {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
 {%- else -%}
-ja: Translate {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
+Translate {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
 {%- endif -%}
 '''
 CREATE_BODY_TEMPLATE = '''

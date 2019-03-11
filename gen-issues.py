@@ -7,10 +7,18 @@ from jinja2 import Template
 
 MAIN_REPO = 'kubernetes/website'
 MAIN_REPO_URL = 'git@github.com:kubernetes/website.git'
+TEST_REPO = 'cstoku/kwebsite'
 LOCAL_REPO_PATH = './.kwebsite'
 
+MILESTONE_NUM = 31
+I18N_LABEL = 'language/ja'
+
 MODIFY_TITLE_TEMPLATE = '''
-ja: Update  in Japanese
+{%- if urlpath -%}
+ja: Update k8s.io/{{ urlpath }}
+{%- else -%}
+ja: Update {{ i18n_path | replace('content/ja/', '', 1) }}
+{%- endif -%}
 '''
 MODIFY_BODY_TEMPLATE = '''
 **This is a...**
@@ -40,16 +48,50 @@ git diff {{ bc }} {{ hc }} -- {{ orig_path }}
 
 {% if urlpath -%}
 **Page to Update:**
+
 https://kubernetes.io/{{ urlpath }}
 {% endif -%}
 '''
-CREATE_TITLE_TEMPLATE = ''
+CREATE_TITLE_TEMPLATE = '''
+{%- if 'docs/setup/' is in i18n_path -%}
+ja: Translate heading and subheading of {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
+{%- else -%}
+ja: Translate {{ i18n_path | replace('content/ja/', '', 1) }} in Japanese
+{%- endif -%}
+'''
 CREATE_BODY_TEMPLATE = '''
+{% set repl_path = i18n_path | replace('content/ja/', '', 1) %}
+**This is a...**
+- [x] Feature Request
+- [ ] Bug Report
 
+**Problem:**
+
+{% if 'docs/setup/' is in urlpath -%}
+No heading and subheading of `{{ repl_path }}` in Japanese.
+{% else -%}
+No `{{ repl_path }}` in Japanese.
+{%- endif %}
+
+**Proposed Solution:**
+
+{% if 'docs/setup/' is in urlpath -%}
+Translate heading and subheading of `{{ repl_path }}` in Japanese.
+{%- else %}
+Translate `{{ repl_path }}` in Japanese.
+{%- endif %}
+
+Copy from en content and Update `{{ i18n_path }}`.
+
+
+{% if urlpath -%}
+**Page to Update:**
+
+https://kubernetes.io/{{ urlpath }}
+{% endif -%}
 '''
 REMOVE_TITLE_TEMPLATE = ''
 REMOVE_BODY_TEMPLATE = '''
-
 '''
 
 upstream_lang_code = 'en'
@@ -118,14 +160,18 @@ def to_urlpath(content_path):
 
 parser = argparse.ArgumentParser(description='Japanese l10n Diff Detail Generator Script???')
 parser.add_argument('pr_number', type=int, help='Target pull request number')
+parser.add_argument('-s', '--startcommit', help='Target pull request number')
 args = parser.parse_args()
 
 token = os.getenv('GITHUB_API_TOKEN')
 
 g = Github(token)
-repo = g.get_repo(MAIN_REPO)
+grepo = g.get_repo(MAIN_REPO)
+trepo = g.get_repo(TEST_REPO)
+milestone = grepo.get_milestone(MILESTONE_NUM)
+i18n_label = grepo.get_label(I18N_LABEL)
 
-pr = repo.get_pull(args.pr_number)
+pr = grepo.get_pull(args.pr_number)
 
 if not pr.merged or pr.base.repo != pr.head.repo:
     print('Not Support...')
@@ -136,13 +182,14 @@ if os.path.exists(LOCAL_REPO_PATH):
 else:
     repo = Repo.clone_from(MAIN_REPO_URL, LOCAL_REPO_PATH, bare=True)
 
+base_ref = args.startcommit if args.startcommit else pr.merge_commit_sha
 base_commit = None
 try:
-    base_commit = repo.commit(pr.merge_commit_sha)
+    base_commit = repo.commit(base_ref)
 except:
-    repo.remotes.origin.fetch(pr.merge_commit_sha)
+    repo.remotes.origin.fetch(base_ref)
 finally:
-    base_commit = repo.commit(pr.merge_commit_sha)
+    base_commit = repo.commit(base_ref)
 
 head_commit = None
 try:
@@ -162,6 +209,8 @@ while not bc == hc:
 
 branch_point = bc
 base_diff = branch_point.diff(base_commit, create_patch=True)
+print(branch_point)
+#exit()
 
 # Check 1. Outdated Localization Contents Check.
 #print('Check 1. Outdated Localization Contents Check.')
@@ -207,7 +256,7 @@ minimum_checker = lambda x: x.startswith('content/en/docs/home/') or  x.startswi
 for obj in upstream_docs_contents:
     if obj.a_path is None and obj.b_path and minimum_checker(obj.b_path):
         #print('Create: ' + obj.b_path)
-        create_contents.append(obj.b_path)
+        create_contents.append(obj)
 
 
 # Check 3. Site strings check.
@@ -232,43 +281,62 @@ for obj in upstream_docs_contents:
 ########################
 # Outdated Contents... #
 ########################
-
 print('\nOutdated Contents...')
 template_title = Template(MODIFY_TITLE_TEMPLATE.strip())
 template_body = Template(MODIFY_BODY_TEMPLATE.strip())
-#issue_title = template_title.render()
-for obj in modify_contents[1:]:
+print(len(modify_contents))
+for obj in modify_contents:
     content = obj.b_path
     patch_lines = obj.diff.decode().split('\n')
     insertions = len([line for line in patch_lines if line.startswith('+')])
     deletions = len([line for line in patch_lines if line.startswith('-')])
+    i18n_path = re.sub(r'^(content|i18n)/en', r'\1/ja', content, 1)
+    issue_title = template_title.render(
+            i18n_path=i18n_path,
+            urlpath=to_urlpath(content)
+        )
     issue_body = template_body.render(
             orig_path=content,
-            i18n_path=re.sub(r'^(content|i18n)/en', r'\1/ja', content, 1),
+            i18n_path=i18n_path,
             insertions=insertions,
             deletions=deletions,
             bc=branch_point.hexsha[:7],
             hc=base_commit.hexsha[:7],
             urlpath=to_urlpath(content)
         )
-    print(issue_body)
-    #exit()
-
+    #print('Issue Title: ' + issue_title)
+    #print('Issue Body:\n' + issue_body)
+    #print()
+    grepo.create_issue(issue_title, issue_body, milestone=milestone, labels=[i18n_label])
+    print('Created Issue: ' + issue_title)
 
 #########################################
 # Added Minimum Translasion Contents... #
 #########################################
 
 print('\nAdded Minimum Translasion Contents...')
-for content in create_contents:
-    print(content)
+template_title = Template(CREATE_TITLE_TEMPLATE.strip())
+template_body = Template(CREATE_BODY_TEMPLATE.strip())
+print(len(create_contents))
+for obj in create_contents:
+    content = obj.b_path
+    i18n_path = re.sub(r'^(content|i18n)/en', r'\1/ja', content, 1)
+    issue_title = template_title.render(i18n_path=i18n_path)
+    issue_body = template_body.render(
+            i18n_path=i18n_path,
+            urlpath=to_urlpath(content)
+        )
+    #print('Issue Title: ' + issue_title)
+    #print('Issue Body:\n' + issue_body)
+    #print()
+    grepo.create_issue(issue_title, issue_body, milestone=milestone, labels=[i18n_label])
+    print('Created Issue: ' + issue_title)
 
 #######################
 # Removed Contents... #
 #######################
-
-print('\nRemoved Contents...')
-if remove_contents:
-    print(remove_contents)
-
+#
+#print('\nRemoved Contents...')
+#if remove_contents:
+#    print(remove_contents)
 
